@@ -14,7 +14,7 @@ const router = express.Router();
 // validation/registerSchema.js
 
 const registerSchema = Joi.object({
-  name: Joi.string().min(2).max(50).required(),   // ✅ match User model
+  name: Joi.string().min(2).max(50).required(), 
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
   role: Joi.string().valid('customer', 'seller', 'admin', 'moderator').default('customer'),
@@ -191,9 +191,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @route   POST /api/auth/refresh
-// @desc    Refresh access token
-// @access  Public
 router.post('/refresh', async (req, res) => {
   try {
     const { error } = refreshTokenSchema.validate(req.body);
