@@ -1,15 +1,13 @@
 import axios from 'axios';
+import { getServiceUrl } from './registryService';
 
-const API_URL = import.meta.env.VITE_REGISTRY_URL  || 'http://localhost:5002';
-
-const apiClient = axios.create({
-  baseURL: API_URL,
+const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-apiClient.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -17,88 +15,96 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
     const { response } = error;
-    
     if (response && response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('userData');
-      
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
-    
     return Promise.reject(error);
   }
 );
 
+const getUserServiceUrl = async () => {
+  try {
+    const service = await getServiceUrl('user');
+    return service.url;
+  } catch (error) {
+    console.error('Failed to get user service URL:', error);
+    throw new Error('User service unavailable');
+  }
+};
+
 const UserService = {
   getUserProfile: async () => {
     try {
-      const response = await apiClient.get('/api/users/profile');
+      const url = await getUserServiceUrl();
+      const response = await api.get(`${url}/api/users/profile`);
       return response.data;
     } catch (error) {
       console.error('Error fetching user profile:', error);
       throw error;
     }
   },
-  
+
   updateUserProfile: async (profileData) => {
     try {
-      const response = await apiClient.put('/api/users/profile', profileData);
+      const url = await getUserServiceUrl();
+      const response = await api.put(`${url}/api/users/profile`, profileData);
       return response.data;
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
     }
   },
-  
+
   getUserById: async (userId) => {
     try {
-      const response = await apiClient.get(`/api/users/${userId}`);
+      const url = await getUserServiceUrl();
+      const response = await api.get(`${url}/api/users/${userId}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching user ${userId}:`, error);
       throw error;
     }
   },
-  
+
   updatePreferences: async (preferences) => {
     try {
-      const response = await apiClient.put('/api/users/profile', { preferences });
+      const url = await getUserServiceUrl();
+      const response = await api.put(`${url}/api/users/profile`, { preferences });
       return response.data;
     } catch (error) {
       console.error('Error updating preferences:', error);
       throw error;
     }
   },
-  
+
   updateAddress: async (address) => {
     try {
-      const response = await apiClient.put('/api/users/profile', { address });
+      const url = await getUserServiceUrl();
+      const response = await api.put(`${url}/api/users/profile`, { address });
       return response.data;
     } catch (error) {
       console.error('Error updating address:', error);
       throw error;
     }
   },
-  
+
   validateToken: async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return false;
-      
-      await apiClient.get('/api/users/profile');
+      const url = await getUserServiceUrl();
+      await api.get(`${url}/api/users/profile`);
       return true;
     } catch (error) {
       return false;

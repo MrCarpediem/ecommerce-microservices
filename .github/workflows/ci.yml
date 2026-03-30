@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  install-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install auth service dependencies
+        run: |
+          cd Backend/authService
+          npm install
+
+      - name: Install user service dependencies
+        run: |
+          cd Backend/userService
+          npm install
+
+      - name: Install product service dependencies
+        run: |
+          cd Backend/productService
+          npm install
+
+      - name: Install cart service dependencies
+        run: |
+          cd Backend/cartService
+          npm install
+
+      - name: Install order service dependencies
+        run: |
+          cd Backend/orderService
+          npm install
+
+      - name: Install service registry dependencies
+        run: |
+          cd Backend/serviceRegistry
+          npm install
+
+      - name: Install frontend dependencies
+        run: |
+          cd Frontend
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd Frontend
+          npm run build

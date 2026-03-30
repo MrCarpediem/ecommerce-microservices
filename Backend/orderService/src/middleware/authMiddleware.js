@@ -1,25 +1,29 @@
-const axios = require('axios');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
-
 const authMiddleware = {
-  verifyToken: async (req, res, next) => {
+  authenticate: (req, res, next) => {
     try {
-      // Since we're using userId from the body and not the token,
-      // this middleware is simplified to just check if a userId exists
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+      const authHeader = req.headers.authorization;
+
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required. No token provided.' });
       }
-      
-      // If you still need to verify that the user exists, you could make a call to the user service
-      // But for now, we'll just pass through since we're accepting userId from the body
-      
+
+      const token = authHeader.split(' ')[1];
+      const JWT_SECRET = process.env.JWT_SECRET;
+      const decoded = jwt.verify(token, JWT_SECRET);
+
+      req.user = {
+        userId: decoded.userId,
+        role: decoded.role,
+        email: decoded.email,
+        username: decoded.username
+      };
+
       next();
     } catch (error) {
-      console.error('Auth middleware error:', error);
+      console.error('Auth middleware error:', error.message);
       return res.status(401).json({ error: 'Authentication failed' });
     }
   }

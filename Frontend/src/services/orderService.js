@@ -5,23 +5,11 @@ const api = axios.create();
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  const userId = localStorage.getItem('userId');
-  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
-  if (userId && config.method !== 'get') {
-    config.data = { ...config.data, userId };
-  }
-  
   return config;
 });
-
-const getWithUserId = async (url, config = {}) => {
-  const userId = localStorage.getItem('userId');
-  return api.post(url, { userId }, config);
-};
 
 const getOrderServiceUrl = async () => {
   try {
@@ -36,7 +24,7 @@ const getOrderServiceUrl = async () => {
 export const getUserOrders = async () => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const response = await getWithUserId(`${serviceUrl}/api/orders`);
+    const response = await api.get(`${serviceUrl}/api/orders`);
     return response.data;
   } catch (error) {
     console.error('Error fetching user orders:', error);
@@ -47,7 +35,7 @@ export const getUserOrders = async () => {
 export const getOrderById = async (orderId) => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const response = await getWithUserId(`${serviceUrl}/api/orders/${orderId}`);
+    const response = await api.get(`${serviceUrl}/api/orders/${orderId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching order ${orderId}:`, error);
@@ -58,14 +46,7 @@ export const getOrderById = async (orderId) => {
 export const createOrder = async (orderData) => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const userId = localStorage.getItem('userId');
-    
-    const orderWithUserId = {
-      ...orderData,
-      userId
-    };
-    
-    const response = await api.post(`${serviceUrl}/api/orders`, orderWithUserId);
+    const response = await api.post(`${serviceUrl}/api/orders`, orderData);
     return response.data;
   } catch (error) {
     console.error('Error creating order:', error);
@@ -76,10 +57,7 @@ export const createOrder = async (orderData) => {
 export const updateOrderStatus = async (orderId, orderStatus) => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const response = await api.patch(
-      `${serviceUrl}/api/orders/${orderId}/status`, 
-      { orderStatus }
-    );
+    const response = await api.patch(`${serviceUrl}/api/orders/${orderId}/status`, { orderStatus });
     return response.data;
   } catch (error) {
     console.error('Error updating order status:', error);
@@ -90,10 +68,7 @@ export const updateOrderStatus = async (orderId, orderStatus) => {
 export const updatePaymentStatus = async (orderId, paymentStatus) => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const response = await api.patch(
-      `${serviceUrl}/api/orders/${orderId}/payment`, 
-      { paymentStatus }
-    );
+    const response = await api.patch(`${serviceUrl}/api/orders/${orderId}/payment`, { paymentStatus });
     return response.data;
   } catch (error) {
     console.error('Error updating payment status:', error);
@@ -104,7 +79,7 @@ export const updatePaymentStatus = async (orderId, paymentStatus) => {
 export const cancelOrder = async (orderId) => {
   try {
     const serviceUrl = await getOrderServiceUrl();
-    const response = await api.patch(`${serviceUrl}/api/orders/${orderId}/cancel`, {});
+    const response = await api.patch(`${serviceUrl}/api/orders/${orderId}/cancel`);
     return response.data;
   } catch (error) {
     console.error('Error cancelling order:', error);

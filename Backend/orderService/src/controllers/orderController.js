@@ -5,11 +5,10 @@ const orderController = {
   // Get all orders for a user
   getAllOrders: async (req, res) => {
     try {
-      // Get userId from request body
-      const { userId } = req.body;
+      const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const orders = await Order.find({ userId }).sort({ createdAt: -1 });
@@ -24,10 +23,10 @@ const orderController = {
   getOrderById: async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId } = req.body;
+      const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const order = await Order.findOne({ _id: id, userId });
@@ -46,10 +45,11 @@ const orderController = {
   // Create a new order
   createOrder: async (req, res) => {
     try {
-      const { userId, items, totalAmount, shippingAddress, paymentMethod } = req.body;
+      const userId = req.user?.userId;
+      const { items, totalAmount, shippingAddress, paymentMethod } = req.body;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
       
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -59,13 +59,10 @@ const orderController = {
       // Validate items (you might want to verify these against the product service)
       for (const item of items) {
         try {
-          // Get product details to verify price and availability
           const productDetails = await ServiceClient.getProductDetails(item.productId);
-          
-          // Update item with verified details
           item.name = productDetails.name;
           item.price = productDetails.price;
-          item.imageUrl = productDetails.imageUrl;
+          item.imageUrl = productDetails.image || productDetails.imageUrl || '';
         } catch (error) {
           console.error(`Failed to verify product ${item.productId}:`, error.message);
           return res.status(400).json({ error: `Invalid product: ${item.productId}` });
@@ -102,10 +99,11 @@ const orderController = {
   updateOrderStatus: async (req, res) => {
     try {
       const { id } = req.params;
-      const { orderStatus, userId } = req.body;
+      const { orderStatus } = req.body;
+      const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const order = await Order.findOne({ _id: id, userId });
@@ -128,10 +126,11 @@ const orderController = {
   updatePaymentStatus: async (req, res) => {
     try {
       const { id } = req.params;
-      const { paymentStatus, userId } = req.body;
+      const { paymentStatus } = req.body;
+      const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const order = await Order.findOne({ _id: id, userId });
@@ -154,10 +153,10 @@ const orderController = {
   cancelOrder: async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId } = req.body;
+      const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(400).json({ error: 'UserId is required in the request body' });
+        return res.status(401).json({ error: 'Authentication required' });
       }
 
       const order = await Order.findOne({ _id: id, userId });

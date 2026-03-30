@@ -1,44 +1,31 @@
-const axios = require('axios');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
+const JWT_SECRET = process.env.JWT_SECRET;
 
-const authenticate = async (req, res, next) => {
+const authenticate = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'Authentication required. No token provided.' });
     }
-    
+
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: 'Authentication required. Token is missing.' });
     }
-    
-    const registryResponse = await axios.get(`${REGISTRY_URL}/service/auth`);
-    const authService = registryResponse.data;
-    
-   
-    const response = await axios.get(`${authService.url}${authService.endpoints.validateToken}`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    
-    if (!response.data.valid) {
-      return res.status(401).json({ message: 'Invalid token.' });
-    }
-    
+
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     req.user = {
-      userId: response.data.userId,
-      username: response.data.username,
-      email: response.data.email,
-      role: response.data.role
+      userId: decoded.userId,
+      username: decoded.username,
+      email: decoded.email,
+      role: decoded.role
     };
-    
+
     next();
   } catch (err) {
     console.error('Auth middleware error:', err.message);
@@ -47,7 +34,7 @@ const authenticate = async (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admin permission required.' });
   }
   next();

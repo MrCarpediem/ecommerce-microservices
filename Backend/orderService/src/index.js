@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const routes = require('./routes/orderRoutes');
 const { registerService } = require('./utils/serviceRegistry');
@@ -7,15 +9,25 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5005;
+const SERVICE_URL = process.env.SERVICE_URL || `http://localhost:${PORT}`;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-// Database connection
+app.use(helmet());
+app.use(cors({ origin: FRONTEND_URL }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(limiter);
+
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URL, {
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/order-service', {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
@@ -28,20 +40,17 @@ const connectDB = async () => {
 
 connectDB();
 
-// Routes
 app.use('/api/orders', routes);
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'Order service is running' });
 });
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`Order service running on port ${PORT}`);
   
-  // Register with service registry
   try {
-    await registerService('order', `http://localhost:${PORT}`, {
+    await registerService('order', SERVICE_URL, {
       getOrders: '/api/orders',
       createOrder: '/api/orders',
       getOrderById: '/api/orders/:id'
@@ -51,3 +60,11 @@ app.listen(PORT, async () => {
     console.error('Failed to register with service registry:', error.message);
   }
 });
+
+const gracefulShutdown = () => {
+  console.log('Gracefully shutting down order service');
+  server.close(() => process.exit(0));
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

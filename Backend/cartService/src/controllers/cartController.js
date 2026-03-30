@@ -1,187 +1,145 @@
 const Cart = require('../models/Cart');
 const serviceClient = require('../utils/serviceRegistry');
+const logger = require('../utils/logger');
+const Joi = require('joi');
 
-// Get cart for specified user
+const addItemSchema = Joi.object({
+  productId: Joi.string().required(),
+  quantity: Joi.number().integer().min(1).default(1)
+});
+
+const updateItemSchema = Joi.object({
+  quantity: Joi.number().integer().min(1).required()
+});
+
+// GET /api/cart
 const getUserCart = async (req, res) => {
   try {
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-    
+    const userId = req.user._id;
     let cart = await Cart.findOne({ userId });
-    
+
     if (!cart) {
-      // Create a new cart if none exists
-      cart = new Cart({
-        userId,
-        items: []
-      });
-      await cart.save();
+      cart = await Cart.create({ userId, items: [] });
     }
-    
-    res.json(cart);
+
+    res.json({ success: true, cart });
   } catch (error) {
-    console.error('Get cart error:', error.message);
-    res.status(500).json({ message: 'Failed to get cart', error: error.message });
+    logger.error('Get cart error:', error.message);
+    res.status(500).json({ error: 'Failed to get cart.' });
   }
 };
 
-// Add item to cart
+// POST /api/cart/items
 const addCartItem = async (req, res) => {
   try {
-    const { userId, productId, quantity } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
+    const { error, value } = addItemSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { productId, quantity } = value;
+    const userId = req.user._id;
+
+    // Fetch product from product service
+    let product;
+    try {
+      product = await serviceClient.getProductDetails(productId);
+    } catch {
+      return res.status(404).json({ error: 'Product not found or product service unavailable.' });
     }
-    
-    if (!productId) {
-      return res.status(400).json({ message: 'Product ID is required' });
-    }
-    
-    // Get product details from product service
-    // Since we're not using tokens anymore, we need to modify how we get product details
-    const product = await serviceClient.getProductDetails(productId);
-    
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-    
-    // Find user's cart or create new one
+
     let cart = await Cart.findOne({ userId });
-    
-    if (!cart) {
-      cart = new Cart({
-        userId,
-        items: []
-      });
-    }
-    
-    // Check if item already exists in cart
-    const existingItemIndex = cart.items.findIndex(
+    if (!cart) cart = await Cart.create({ userId, items: [] });
+
+    const existingIndex = cart.items.findIndex(
       item => item.productId.toString() === productId
     );
-    
-    if (existingItemIndex > -1) {
-      // Update quantity if item exists
-      cart.items[existingItemIndex].quantity += parseInt(quantity || 1);
+
+    if (existingIndex > -1) {
+      cart.items[existingIndex].quantity += quantity;
     } else {
-      // Add new item
       cart.items.push({
         productId,
         name: product.name,
         price: product.price,
-        quantity: parseInt(quantity || 1),
+        quantity,
         image: product.image || ''
       });
     }
-    
-    cart.updatedAt = Date.now();
+
     await cart.save();
-    
-    res.status(201).json(cart);
+    logger.info(`Item added to cart for user: ${userId}`);
+    res.status(201).json({ success: true, cart });
   } catch (error) {
-    console.error('Add to cart error:', error.message);
-    res.status(500).json({ message: 'Failed to add item to cart', error: error.message });
+    logger.error('Add to cart error:', error.message);
+    res.status(500).json({ error: 'Failed to add item to cart.' });
   }
 };
 
-// Update cart item quantity
+// PUT /api/cart/items/:itemId
 const updateCartItem = async (req, res) => {
   try {
+    const { error, value } = updateItemSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
     const { itemId } = req.params;
-    const { userId, quantity } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-    
-    if (!quantity || quantity < 1) {
-      return res.status(400).json({ message: 'Valid quantity is required' });
-    }
-    
+    const userId = req.user._id;
+
     const cart = await Cart.findOne({ userId });
-    
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-    
+    if (!cart) return res.status(404).json({ error: 'Cart not found.' });
+
     const itemIndex = cart.items.findIndex(item => item._id.toString() === itemId);
-    
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: 'Item not found in cart' });
-    }
-    
-    cart.items[itemIndex].quantity = parseInt(quantity);
-    cart.updatedAt = Date.now();
+    if (itemIndex === -1) return res.status(404).json({ error: 'Item not found in cart.' });
+
+    cart.items[itemIndex].quantity = value.quantity;
     await cart.save();
-    
-    res.json(cart);
+
+    res.json({ success: true, cart });
   } catch (error) {
-    console.error('Update cart item error:', error.message);
-    res.status(500).json({ message: 'Failed to update cart item', error: error.message });
+    logger.error('Update cart item error:', error.message);
+    res.status(500).json({ error: 'Failed to update cart item.' });
   }
 };
 
-// Remove item from cart
+// DELETE /api/cart/items/:itemId
 const removeCartItem = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-    
+    const userId = req.user._id;
+
     const cart = await Cart.findOne({ userId });
-    
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-    
+    if (!cart) return res.status(404).json({ error: 'Cart not found.' });
+
+    const originalLength = cart.items.length;
     cart.items = cart.items.filter(item => item._id.toString() !== itemId);
-    cart.updatedAt = Date.now();
+
+    if (cart.items.length === originalLength) {
+      return res.status(404).json({ error: 'Item not found in cart.' });
+    }
+
     await cart.save();
-    
-    res.json(cart);
+    res.json({ success: true, cart });
   } catch (error) {
-    console.error('Remove cart item error:', error.message);
-    res.status(500).json({ message: 'Failed to remove cart item', error: error.message });
+    logger.error('Remove cart item error:', error.message);
+    res.status(500).json({ error: 'Failed to remove cart item.' });
   }
 };
 
-// Clear cart
+// DELETE /api/cart
 const clearCart = async (req, res) => {
   try {
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-    
+    const userId = req.user._id;
+
     const cart = await Cart.findOne({ userId });
-    
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-    
+    if (!cart) return res.status(404).json({ error: 'Cart not found.' });
+
     cart.items = [];
-    cart.updatedAt = Date.now();
     await cart.save();
-    
-    res.json({ message: 'Cart cleared', cart });
+
+    logger.info(`Cart cleared for user: ${userId}`);
+    res.json({ success: true, message: 'Cart cleared.', cart });
   } catch (error) {
-    console.error('Clear cart error:', error.message);
-    res.status(500).json({ message: 'Failed to clear cart', error: error.message });
+    logger.error('Clear cart error:', error.message);
+    res.status(500).json({ error: 'Failed to clear cart.' });
   }
 };
 
-module.exports = {
-  getUserCart,
-  addCartItem,
-  updateCartItem,
-  removeCartItem,
-  clearCart
-};
+module.exports = { getUserCart, addCartItem, updateCartItem, removeCartItem, clearCart };

@@ -1,59 +1,70 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const mongoose = require('mongoose');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const connectDB = require('./config/db');
+const logger = require('./utils/logger');
+const cartRoutes = require('./routes/cartRoutes');
+const axios = require('axios');
 require('dotenv').config();
 
-const cartRoutes = require('./routes/cartRoutes');
 const app = express();
 const PORT = process.env.PORT || 5004;
+const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
+const SERVICE_URL = process.env.SERVICE_URL || `http://localhost:${PORT}`;
 
-// Connect to MongoDB
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log('MongoDB connected successfully');
-  } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  }
-};
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
 
 connectDB();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use('/api/cart', limiter);
+app.use('/api/cart', cartRoutes);
 
-// Routes
-app.use('/api/carts', cartRoutes);
+// Global error handler
+app.use((err, req, res, next) => {
+  logger.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong.' });
+});
 
-// Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'Cart service is running' });
+  res.json({ status: 'ok', service: 'cart-service', timestamp: new Date().toISOString() });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Cart service running on port ${PORT}`);
-
-  const axios = require('axios');
-  const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
-
-  // Register with service registry
-  axios.post(`${REGISTRY_URL}/register`, {
-    name: 'cart',
-    url: `http://localhost:${PORT}`,
-    endpoints: {
-      getUserCart: '/api/carts/get',
-      addCartItem: '/api/carts/items',
-      updateCartItem: '/api/carts/items/:itemId',
-      removeCartItem: '/api/carts/items/:itemId/remove',
-      clearCart: '/api/carts/clear'
-    }
-  }).then(() => {
-    console.log('✅ Successfully registered cart service with the service registry.');
-  }).catch(err => {
-    console.log('Failed to register with service registry:', err.message);
-  });
+const server = app.listen(PORT, async () => {
+  logger.info(`Cart service running on port ${PORT}`);
+  try {
+    await axios.post(`${REGISTRY_URL}/register`, {
+      name: 'cart',
+      url: SERVICE_URL,
+      endpoints: {
+        getCart: '/api/cart',
+        addItem: '/api/cart/items',
+        updateItem: '/api/cart/items/:itemId',
+        removeItem: '/api/cart/items/:itemId',
+        clearCart: '/api/cart',
+        internalClear: '/api/cart/internal/clear'
+      }
+    });
+    logger.info('Cart service registered with service registry.');
+  } catch (err) {
+    logger.warn('Could not register with service registry:', err.message);
+  }
 });
+
+const gracefulShutdown = () => {
+  logger.info('Gracefully shutting down cart service...');
+  server.close(() => process.exit(0));
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

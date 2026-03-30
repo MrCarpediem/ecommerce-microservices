@@ -22,13 +22,9 @@ export const CartProvider = ({ children }) => {
   // Fetch cart when user changes
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      // Store userId in localStorage for services to use
-      localStorage.setItem('userId', currentUser._id);
       fetchCart();
     } else {
-      // Clear cart when logged out
       setCart({ items: [] });
-      localStorage.removeItem('userId');
     }
   }, [isAuthenticated, currentUser]);
 

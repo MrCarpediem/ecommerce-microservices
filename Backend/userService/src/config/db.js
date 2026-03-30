@@ -4,11 +4,12 @@ require('dotenv').config();
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI_USER, {
+    const mongoUri = process.env.MONGO_URI || process.env.MONGO_URI_USER || 'mongodb://localhost:27017/user-service';
+
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log(process.env.MONGO_URI_USER)
     console.log('MongoDB Connected - User Service');
   } catch (err) {
     console.error('MongoDB connection error:', err.message);

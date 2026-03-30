@@ -1,167 +1,142 @@
-// auth-service/src/controllers/auth.controller.js
-const User = require('../models/user');
-const { generateToken, verifyToken } = require('../utils/tokenUtils');
+const User = require('../models/User');
+const Role = require('../models/Role');
+const { generateAccessToken, generateRefreshToken, verifyToken } = require('../utils/jwt');
+const logger = require('../utils/logger');
+const Joi = require('joi');
 
-// Register a new user
+// Validation schemas
+const registerSchema = Joi.object({
+  name: Joi.string().min(2).max(50).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  role: Joi.string().valid('customer', 'seller', 'moderator', 'admin').default('customer')
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required()
+});
+
+// Register
 const register = async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
-    
-    // Check if user already exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists with this email or username' });
-    }
-    
-    // Create new user
-    const user = new User({
-      username,
-      email,
-      password,
-      role: role || 'user'
-    });
-    
+    const { error, value } = registerSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { name, email, password, role: roleName } = value;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: 'Email already registered.' });
+
+    const role = await Role.findOne({ name: roleName });
+    if (!role) return res.status(400).json({ error: 'Invalid role.' });
+
+    const user = await User.create({ name, email, password, role: role._id });
+    await user.populate('role');
+
+    const accessToken = generateAccessToken({ userId: user._id, role: role.name });
+    const refreshToken = generateRefreshToken({ userId: user._id });
+
+    // Save refresh token
+    user.refreshToken = refreshToken;
     await user.save();
-    
-    // Generate token
-    const token = generateToken(user._id);
-    
-    res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role
-      }
-    });
+
+    logger.info(`New user registered: ${email}`);
+    res.status(201).json({ message: 'Registered successfully', accessToken, refreshToken, user });
+
   } catch (err) {
-    console.error('Registration error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Register error:', err.message);
+    res.status(500).json({ error: 'Server error during registration.' });
   }
 };
 
-// Login user
+// Login
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    
-    // Find user by email
-    const user = await User.findOne({ email });
-    
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    const { error, value } = loginSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { email, password } = value;
+
+    const user = await User.findOne({ email }).populate('role');
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
-    
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-    
-    // Generate token
-    const token = generateToken(user._id);
-    
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role
-      }
-    });
+
+    if (!user.isActive) return res.status(401).json({ error: 'Account deactivated.' });
+
+    const accessToken = generateAccessToken({ userId: user._id, role: user.role.name });
+    const refreshToken = generateRefreshToken({ userId: user._id });
+
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save();
+
+    logger.info(`User logged in: ${email}`);
+    res.json({ message: 'Login successful', accessToken, refreshToken, user });
+
   } catch (err) {
-    console.error('Login error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Login error:', err.message);
+    res.status(500).json({ error: 'Server error during login.' });
   }
 };
 
-// Get user information
-const getUser = async (req, res) => {
+// Refresh Token
+const refresh = async (req, res) => {
   try {
-    const user = req.user;
-    
-    res.json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
-    });
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required.' });
+
+    const decoded = verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.userId).populate('role');
+
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(401).json({ error: 'Invalid refresh token.' });
+    }
+
+    const accessToken = generateAccessToken({ userId: user._id, role: user.role.name });
+    res.json({ accessToken });
+
   } catch (err) {
-    console.error('Get user error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Refresh error:', err.message);
+    res.status(401).json({ error: 'Invalid or expired refresh token.' });
   }
 };
 
-// Validate token
+// Logout
+const logout = async (req, res) => {
+  try {
+    req.user.refreshToken = null;
+    await req.user.save();
+    logger.info(`User logged out: ${req.user.email}`);
+    res.json({ message: 'Logged out successfully.' });
+  } catch (err) {
+    logger.error('Logout error:', err.message);
+    res.status(500).json({ error: 'Server error during logout.' });
+  }
+};
+
+// Get current user
+const getMe = async (req, res) => {
+  res.json({ user: req.user });
+};
+
+// Validate token (for other services)
 const validateToken = async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ valid: false, message: 'No token provided' });
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ valid: false });
     }
-    
     const token = authHeader.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ valid: false, message: 'Token is missing' });
-    }
-    
-    const decoded = verifyToken(token);
-    
-    // Find user by id
-    const user = await User.findById(decoded.userId).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ valid: false, message: 'User not found' });
-    }
-    
-    return res.json({ 
-      valid: true, 
-      userId: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
-    });
+    const decoded = verifyToken(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).populate('role');
+    if (!user) return res.status(404).json({ valid: false });
+
+    res.json({ valid: true, userId: user._id, email: user.email, role: user.role.name });
   } catch (err) {
-    console.error('Validate token error:', err.message);
-    return res.status(401).json({ valid: false, message: err.message });
+    res.status(401).json({ valid: false, message: err.message });
   }
 };
 
-// Get user by ID (internal service use)
-const getUserById = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    
-    const user = await User.findById(userId).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    res.json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
-    });
-  } catch (err) {
-    console.error('Get user by ID error:', err.message);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-module.exports = {
-  register,
-  login,
-  getUser,
-  validateToken,
-  getUserById
-};
+module.exports = { register, login, refresh, logout, getMe, validateToken };

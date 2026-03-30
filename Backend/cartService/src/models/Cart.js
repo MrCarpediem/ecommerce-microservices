@@ -5,59 +5,32 @@ const CartItemSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true
   },
-  name: {
-    type: String,
-    required: true
-  },
-  price: {
-    type: Number,
-    required: true
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1,
-    default: 1
-  },
-  image: {
-    type: String,
-    default: ''
-  }
-});
+  name: { type: String, required: true },
+  price: { type: Number, required: true, min: 0 },
+  quantity: { type: Number, required: true, min: 1, default: 1 },
+  image: { type: String, default: '' }
+}, { _id: true });
 
 const CartSchema = new mongoose.Schema({
   userId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
     required: true,
+    unique: true,
     index: true
   },
-  items: [CartItemSchema],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
+  items: [CartItemSchema]
+}, { timestamps: true });
+
+CartSchema.virtual('total').get(function () {
+  return parseFloat(
+    this.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)
+  );
 });
 
-// Virtual for calculating total cart value
-CartSchema.virtual('total').get(function() {
-  return this.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+CartSchema.virtual('itemCount').get(function () {
+  return this.items.reduce((count, item) => count + item.quantity, 0);
 });
 
-// Add a method to calculate cart totals
-CartSchema.methods.calculateTotals = function() {
-  return {
-    subtotal: this.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-    itemCount: this.items.reduce((count, item) => count + item.quantity, 0)
-  };
-};
-
-// Ensure virtuals are included when converting to JSON
 CartSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Cart', CartSchema);

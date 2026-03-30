@@ -47,15 +47,18 @@ class ServiceClient {
   
   async clearCart(userId) {
     try {
-      // Get cart service details from registry
       const cartService = await this.getServiceUrl('cart');
-      
-      // Clear the user's cart after successful order creation
-      const response = await axios.delete(
+
+      const response = await axios.post(
         `${cartService.url}/api/carts/clear`,
-        { data: { userId } }  // Send userId in the body of the DELETE request
+        { userId },
+        {
+          headers: {
+            'x-service-secret': process.env.SERVICE_SECRET
+          }
+        }
       );
-      
+
       return response.data;
     } catch (error) {
       console.error('Error clearing cart:', error.message);

@@ -1,17 +1,17 @@
-// auth-service/src/config/db.js
 const mongoose = require('mongoose');
-require('dotenv').config();
+const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URL, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log(process.env.MONGODB_URL)
-    console.log('MongoDB Connected - Auth Service');
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/auth-service';
+    
+    mongoose.connection.on('connected', () => logger.info('MongoDB Connected - Auth Service'));
+    mongoose.connection.on('error', (err) => logger.error('MongoDB error:', err));
+    mongoose.connection.on('disconnected', () => logger.warn('MongoDB Disconnected'));
+
+    await mongoose.connect(mongoUri);
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
+    logger.error('MongoDB connection failed:', err.message);
     process.exit(1);
   }
 };

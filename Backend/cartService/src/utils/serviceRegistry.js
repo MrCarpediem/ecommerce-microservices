@@ -1,7 +1,8 @@
 const axios = require('axios');
-require('dotenv').config();
+const logger = require('./logger');
 
 const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
+const SERVICE_SECRET = process.env.SERVICE_SECRET;
 
 class ServiceClient {
   async getServiceUrl(serviceName) {
@@ -9,25 +10,24 @@ class ServiceClient {
       const response = await axios.get(`${REGISTRY_URL}/service/${serviceName}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to get ${serviceName} service details:`, error.message);
-      throw error;
+      logger.error(`Failed to get ${serviceName} service URL:`, error.message);
+      throw new Error(`Service ${serviceName} not found in registry`);
     }
   }
-  
+
   async getProductDetails(productId) {
     try {
-      // Get product service details from registry
       const productService = await this.getServiceUrl('product');
-      
-      // Get product details from product service without token
       const response = await axios.get(
-        `${productService.url}/api/products/${productId}`
+        `${productService.url}/api/products/${productId}`,
+        {
+          headers: { 'x-service-secret': SERVICE_SECRET }
+        }
       );
-      
       return response.data;
     } catch (error) {
-      console.error('Error fetching product details:', error.message);
-      throw error;
+      logger.error('Error fetching product details:', error.message);
+      throw new Error('Product service unavailable');
     }
   }
 }
