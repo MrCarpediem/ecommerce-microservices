@@ -1,16 +1,17 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
+const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/order-service', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-    return conn;
-  } catch (error) {
-    console.error(`Error connecting to MongoDB: ${error.message}`);
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/order-service';
+
+    mongoose.connection.on('connected', () => logger.info('MongoDB Connected - Order Service'));
+    mongoose.connection.on('error', (err) => logger.error('MongoDB error:', err));
+    mongoose.connection.on('disconnected', () => logger.warn('MongoDB Disconnected'));
+
+    await mongoose.connect(mongoUri);
+  } catch (err) {
+    logger.error('MongoDB connection failed:', err.message);
     process.exit(1);
   }
 };

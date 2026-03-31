@@ -1,137 +1,141 @@
+const UserProfile = require('../models/userModel');
+const logger = require('../utils/logger');
+const Joi = require('joi');
 
-const User = require('../models/userModel');
-const { getUserFromAuthService } = require('../utils/serviceRegistry');
+const updateProfileSchema = Joi.object({
+  firstName: Joi.string().min(2).max(50).optional(),
+  lastName: Joi.string().min(2).max(50).optional(),
+  phoneNumber: Joi.string().pattern(/^[0-9]{10}$/).optional(),
+  preferences: Joi.object({
+    theme: Joi.string().valid('light', 'dark'),
+    notifications: Joi.boolean(),
+    language: Joi.string()
+  }).optional()
+});
 
+const addressSchema = Joi.object({
+  label: Joi.string().valid('home', 'work', 'other').default('home'),
+  street: Joi.string().required(),
+  city: Joi.string().required(),
+  state: Joi.string().required(),
+  zipCode: Joi.string().required(),
+  country: Joi.string().default('India'),
+  isDefault: Joi.boolean().default(false)
+});
+
+// GET /api/users/profile
 const getUserProfile = async (req, res) => {
   try {
-    const { userId } = req.user;
-    
-    
-    let userProfile = await User.findOne({ userId });
-    
-    if (!userProfile) {
-      
-      userProfile = new User({ userId });
-      await userProfile.save();
+    let profile = await UserProfile.findOne({ userId: req.user._id });
+
+    if (!profile) {
+      profile = await UserProfile.create({ userId: req.user._id });
     }
-    
-    
-    const authToken = req.headers.authorization.split(' ')[1];
-    const authUserData = await getUserFromAuthService(userId, authToken);
-    
-    
-    const userResponse = {
-      userId: userProfile.userId,
-      username: authUserData.username,
-      email: authUserData.email,
-      firstName: userProfile.firstName,
-      lastName: userProfile.lastName,
-      phoneNumber: userProfile.phoneNumber,
-      address: userProfile.address,
-      preferences: userProfile.preferences
-    };
-    
-    res.json(userResponse);
+
+    res.json({ success: true, profile });
   } catch (err) {
-    console.error('Get user profile error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Get profile error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
-
+// PUT /api/users/profile
 const updateUserProfile = async (req, res) => {
   try {
-    const { userId } = req.user;
-    const { firstName, lastName, phoneNumber, address, preferences } = req.body;
-    
-    
-    let userProfile = await User.findOne({ userId });
-    
-    if (!userProfile) {
-      
-      userProfile = new User({
-        userId,
-        firstName: firstName || '',
-        lastName: lastName || '',
-        phoneNumber: phoneNumber || '',
-        address: address || {},
-        preferences: preferences || {}
-      });
+    const { error, value } = updateProfileSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    let profile = await UserProfile.findOne({ userId: req.user._id });
+
+    if (!profile) {
+      profile = await UserProfile.create({ userId: req.user._id, ...value });
     } else {
-      
-      if (firstName !== undefined) userProfile.firstName = firstName;
-      if (lastName !== undefined) userProfile.lastName = lastName;
-      if (phoneNumber !== undefined) userProfile.phoneNumber = phoneNumber;
-      
-      if (address) {
-        userProfile.address = {
-          ...userProfile.address,
-          ...(address.street !== undefined && { street: address.street }),
-          ...(address.city !== undefined && { city: address.city }),
-          ...(address.state !== undefined && { state: address.state }),
-          ...(address.zipCode !== undefined && { zipCode: address.zipCode }),
-          ...(address.country !== undefined && { country: address.country })
-        };
-      }
-      
-      
-      if (preferences) {
-        userProfile.preferences = {
-          ...userProfile.preferences,
-          ...(preferences.theme !== undefined && { theme: preferences.theme }),
-          ...(preferences.notifications !== undefined && { notifications: preferences.notifications })
-        };
-      }
+      Object.assign(profile, value);
+      await profile.save();
     }
-    
-    userProfile.updatedAt = Date.now();
-    await userProfile.save();
-    
-    res.json({
-      message: 'Profile updated successfully',
-      profile: {
-        userId: userProfile.userId,
-        firstName: userProfile.firstName,
-        lastName: userProfile.lastName,
-        phoneNumber: userProfile.phoneNumber,
-        address: userProfile.address,
-        preferences: userProfile.preferences,
-        updatedAt: userProfile.updatedAt
-      }
-    });
+
+    logger.info(`Profile updated for user: ${req.user._id}`);
+    res.json({ success: true, profile });
   } catch (err) {
-    console.error('Update user profile error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Update profile error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
+// POST /api/users/addresses
+const addAddress = async (req, res) => {
+  try {
+    const { error, value } = addressSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
 
+    let profile = await UserProfile.findOne({ userId: req.user._id });
+    if (!profile) profile = await UserProfile.create({ userId: req.user._id });
+
+    // Agar isDefault true hai toh baaki sab false karo
+    if (value.isDefault) {
+      profile.addresses.forEach(addr => addr.isDefault = false);
+    }
+
+    profile.addresses.push(value);
+    await profile.save();
+
+    logger.info(`Address added for user: ${req.user._id}`);
+    res.status(201).json({ success: true, addresses: profile.addresses });
+  } catch (err) {
+    logger.error('Add address error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
+  }
+};
+
+// DELETE /api/users/addresses/:addressId
+const removeAddress = async (req, res) => {
+  try {
+    const profile = await UserProfile.findOne({ userId: req.user._id });
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    profile.addresses = profile.addresses.filter(
+      addr => addr._id.toString() !== req.params.addressId
+    );
+    await profile.save();
+
+    res.json({ success: true, addresses: profile.addresses });
+  } catch (err) {
+    logger.error('Remove address error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
+  }
+};
+
+// GET /api/users/:userId — internal service use
 const getUserById = async (req, res) => {
   try {
-    const { userId } = req.params;
-    
-    
-    const userProfile = await User.findOne({ userId });
-    
-    if (!userProfile) {
-      return res.status(404).json({ message: 'User profile not found' });
-    }
-    
-    res.json({
-      userId: userProfile.userId,
-      firstName: userProfile.firstName,
-      lastName: userProfile.lastName,
-      phoneNumber: userProfile.phoneNumber,
-      address: userProfile.address
-    });
+    const profile = await UserProfile.findOne({ userId: req.params.userId });
+    if (!profile) return res.status(404).json({ error: 'User profile not found.' });
+    res.json({ success: true, profile });
   } catch (err) {
-    console.error('Get user by ID error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Get user by ID error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
-module.exports = {
-  getUserProfile,
-  updateUserProfile,
-  getUserById
+// GET /api/users — admin only
+const getAllUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    const [profiles, total] = await Promise.all([
+      UserProfile.find()
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum),
+      UserProfile.countDocuments()
+    ]);
+
+    res.json({ success: true, total, totalPages: Math.ceil(total / limitNum), currentPage: pageNum, profiles });
+  } catch (err) {
+    logger.error('Get all users error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
+  }
 };
+
+module.exports = { getUserProfile, updateUserProfile, addAddress, removeAddress, getUserById, getAllUsers };

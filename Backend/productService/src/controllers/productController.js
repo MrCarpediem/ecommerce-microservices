@@ -1,143 +1,154 @@
 const Product = require('../models/productModel');
+const logger = require('../utils/logger');
+const Joi = require('joi');
 const fs = require('fs');
 const path = require('path');
 
+const productSchema = Joi.object({
+  name: Joi.string().min(2).max(100).required(),
+  description: Joi.string().min(10).required(),
+  price: Joi.number().min(0).required(),
+  category: Joi.string().required(),
+  stock: Joi.number().integer().min(0).default(0)
+});
+
+const updateSchema = Joi.object({
+  name: Joi.string().min(2).max(100),
+  description: Joi.string().min(10),
+  price: Joi.number().min(0),
+  category: Joi.string(),
+  stock: Joi.number().integer().min(0)
+});
+
+// POST /api/products
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, category, stock } = req.body;
-    const { userId } = req.user;
+    const { error, value } = productSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
     const image = req.file ? `/uploads/${req.file.filename}` : '';
 
-    const product = new Product({
-      name,
-      description,
-      price: parseFloat(price),
-      category,
-      stock: parseInt(stock || 0),
+    const product = await Product.create({
+      ...value,
       image,
-      createdBy: userId
+      createdBy: req.user._id
     });
 
-    await product.save();
-
-    res.status(201).json({
-      message: 'Product created successfully',
-      product
-    });
+    logger.info(`Product created: ${product.name} by ${req.user._id}`);
+    res.status(201).json({ success: true, product });
   } catch (err) {
-    console.error('Create product error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Create product error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
+// GET /api/products
 const getAllProducts = async (req, res) => {
   try {
-    const { category, sort, page = 1, limit = 10 } = req.query;
-    const query = {};
+    const { category, sort, page = 1, limit = 10, search } = req.query;
+    const query = { isActive: true };
 
     if (category) query.category = category;
+    if (search) query.$text = { $search: search };
 
-    let sortOptions = {};
+    let sortOptions = { createdAt: -1 };
     if (sort) {
       const [field, order] = sort.split(':');
-      sortOptions[field] = order === 'desc' ? -1 : 1;
-    } else {
-      sortOptions = { createdAt: -1 };
+      sortOptions = { [field]: order === 'desc' ? -1 : 1 };
     }
 
-    const products = await Product.find(query)
-      .sort(sortOptions)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
 
-    const total = await Product.countDocuments(query);
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .sort(sortOptions)
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum),
+      Product.countDocuments(query)
+    ]);
 
     res.json({
-      totalProducts: total,
-      totalPages: Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
+      success: true,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
       products
     });
   } catch (err) {
-    console.error('Get products error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Get products error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
+// GET /api/products/:id
 const getProductById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const product = await Product.findById(id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json(product);
+    const product = await Product.findById(req.params.id);
+    if (!product || !product.isActive) {
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+    res.json({ success: true, product });
   } catch (err) {
-    console.error('Get product by ID error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Get product error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
+// PUT /api/products/:id
 const updateProduct = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, description, price, category, stock } = req.body;
-    const { userId, role } = req.user;
-    const product = await Product.findById(id);
+    const { error, value } = updateSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
 
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    if (product.createdBy.toString() !== userId && role !== 'admin')
-      return res.status(403).json({ message: 'Not authorized to update this product' });
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found.' });
 
-    if (name) product.name = name;
-    if (description) product.description = description;
-    if (price) product.price = parseFloat(price);
-    if (category) product.category = category;
-    if (stock !== undefined) product.stock = parseInt(stock);
+    // Only creator or admin can update
+    if (product.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to update this product.' });
+    }
 
     if (req.file) {
+      // Delete old image
       if (product.image) {
-        const oldImagePath = path.join(__dirname, '../../', product.image);
-        if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
+        const oldPath = path.join(__dirname, '../../', product.image);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
-      product.image = `/uploads/${req.file.filename}`;
+      value.image = `/uploads/${req.file.filename}`;
     }
 
-    product.updatedAt = Date.now();
+    Object.assign(product, value);
     await product.save();
 
-    res.json({ message: 'Product updated successfully', product });
+    logger.info(`Product updated: ${product._id}`);
+    res.json({ success: true, product });
   } catch (err) {
-    console.error('Update product error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Update product error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
+// DELETE /api/products/:id
 const deleteProduct = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { userId, role } = req.user;
-    const product = await Product.findById(id);
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found.' });
 
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    if (product.createdBy.toString() !== userId && role !== 'admin')
-      return res.status(403).json({ message: 'Not authorized to delete this product' });
-
-    if (product.image) {
-      const imagePath = path.join(__dirname, '../../', product.image);
-      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+    if (product.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to delete this product.' });
     }
 
-    await product.deleteOne();
-    res.json({ message: 'Product deleted successfully' });
+    // Soft delete
+    product.isActive = false;
+    await product.save();
+
+    logger.info(`Product deleted: ${product._id}`);
+    res.json({ success: true, message: 'Product deleted successfully.' });
   } catch (err) {
-    console.error('Delete product error:', err.message);
-    res.status(500).json({ message: 'Server error' });
+    logger.error('Delete product error:', err.message);
+    res.status(500).json({ error: 'Server error.' });
   }
 };
 
-module.exports = {
-  createProduct,
-  getAllProducts,
-  getProductById,
-  updateProduct,
-  deleteProduct
-};
+module.exports = { createProduct, getAllProducts, getProductById, updateProduct, deleteProduct };

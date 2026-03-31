@@ -1,7 +1,8 @@
 const axios = require('axios');
-require('dotenv').config();
+const logger = require('./logger');
 
 const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
+const SERVICE_SECRET = process.env.SERVICE_SECRET;
 
 class ServiceClient {
   async getServiceUrl(serviceName) {
@@ -9,60 +10,39 @@ class ServiceClient {
       const response = await axios.get(`${REGISTRY_URL}/service/${serviceName}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to get ${serviceName} service details:`, error.message);
-      throw error;
+      logger.error(`Failed to get ${serviceName} service URL:`, error.message);
+      throw new Error(`Service ${serviceName} not found in registry`);
     }
   }
-  
-  async registerService(name, url, endpoints) {
-    try {
-      const response = await axios.post(`${REGISTRY_URL}/register`, {
-        name,
-        url,
-        endpoints
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to register ${name} service:`, error.message);
-      throw error;
-    }
-  }
-  
+
   async getProductDetails(productId) {
     try {
-      // Get product service details from registry
       const productService = await this.getServiceUrl('product');
-      
-      // Get product details from product service
       const response = await axios.get(
         `${productService.url}/api/products/${productId}`
       );
-      
-      return response.data;
+      // productService returns { success: true, product: {...} }
+      return response.data.product || response.data;
     } catch (error) {
-      console.error('Error fetching product details:', error.message);
-      throw error;
+      logger.error('Error fetching product details:', error.message);
+      throw new Error(`Product ${productId} not found`);
     }
   }
-  
+
   async clearCart(userId) {
     try {
       const cartService = await this.getServiceUrl('cart');
-
       const response = await axios.post(
-        `${cartService.url}/api/carts/clear`,
+        `${cartService.url}/api/cart/internal/clear`,
         { userId },
         {
-          headers: {
-            'x-service-secret': process.env.SERVICE_SECRET
-          }
+          headers: { 'x-service-secret': SERVICE_SECRET }
         }
       );
-
       return response.data;
     } catch (error) {
-      console.error('Error clearing cart:', error.message);
-      throw error;
+      logger.error('Error clearing cart:', error.message);
+      throw new Error('Cart service unavailable');
     }
   }
 }

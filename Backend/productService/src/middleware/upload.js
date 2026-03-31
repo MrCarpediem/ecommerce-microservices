@@ -11,26 +11,26 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`);
+    const uniqueName = `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
+    cb(null, uniqueName);
   }
 });
 
 const fileFilter = (req, file, cb) => {
-  const filetypes = /jpeg|jpg|png|webp/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
+  const allowed = /jpeg|jpg|png|webp/;
+  const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
+  const mimeOk = allowed.test(file.mimetype);
+  if (extOk && mimeOk) {
+    cb(null, true);
   } else {
     cb(new Error('Only images (jpeg, jpg, png, webp) are allowed'));
   }
 };
 
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5000000 },
-  fileFilter: fileFilter
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter
 });
 
 module.exports = upload;

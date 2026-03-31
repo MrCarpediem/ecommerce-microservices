@@ -1,16 +1,26 @@
 const express = require('express');
-const orderController = require('../controllers/orderController');
-const authMiddleware = require('../middleware/authMiddleware');
-
 const router = express.Router();
+const { authenticate } = require('../middleware/auth');
+const { authorize } = require('../middleware/rbac');
+const {
+  getAllOrders,
+  getOrderById,
+  createOrder,
+  updateOrderStatus,
+  cancelOrder,
+  getAllOrdersAdmin
+} = require('../controllers/orderController');
 
-router.use(authMiddleware.authenticate);
+// Admin — all orders
+router.get('/admin/all', authenticate, authorize('admin'), getAllOrdersAdmin);
 
-router.get('/', orderController.getAllOrders);
-router.get('/:id', orderController.getOrderById);
-router.post('/', orderController.createOrder);
-router.patch('/:id/status', orderController.updateOrderStatus);
-router.patch('/:id/payment', orderController.updatePaymentStatus);
-router.patch('/:id/cancel', orderController.cancelOrder);
+// Customer routes
+router.get('/', authenticate, getAllOrders);
+router.get('/:id', authenticate, getOrderById);
+router.post('/', authenticate, createOrder);
+router.patch('/:id/cancel', authenticate, cancelOrder);
+
+// Admin/Seller — status update
+router.patch('/:id/status', authenticate, authorize('admin', 'seller'), updateOrderStatus);
 
 module.exports = router;

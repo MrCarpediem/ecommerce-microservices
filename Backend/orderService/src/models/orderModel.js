@@ -1,49 +1,32 @@
 const mongoose = require('mongoose');
 
-const OrderItemSchema = new mongoose.Schema({
-  productId: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  price: {
-    type: Number,
-    required: true
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  imageUrl: {
-    type: String
-  }
-});
+const orderItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  name: { type: String, required: true },
+  price: { type: Number, required: true, min: 0 },
+  quantity: { type: Number, required: true, min: 1 },
+  imageUrl: { type: String, default: '' }
+}, { _id: true });
 
-const OrderSchema = new mongoose.Schema({
+const orderSchema = new mongoose.Schema({
   userId: {
-    type: String,
-    required: true
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    index: true
   },
-  items: [OrderItemSchema],
-  totalAmount: {
-    type: Number,
-    required: true
-  },
+  items: [orderItemSchema],
+  totalAmount: { type: Number, required: true, min: 0 },
   shippingAddress: {
-    street: String,
-    city: String,
-    state: String,
-    zipCode: String,
-    country: String
+    street: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    zipCode: { type: String, required: true },
+    country: { type: String, default: 'India' }
   },
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['Credit Card', 'PayPal', 'Cash on Delivery']
+    enum: ['Credit Card', 'Debit Card', 'UPI', 'Cash on Delivery', 'PayPal']
   },
   paymentStatus: {
     type: String,
@@ -53,8 +36,10 @@ const OrderSchema = new mongoose.Schema({
   orderStatus: {
     type: String,
     default: 'Processing',
-    enum: ['Processing', 'Shipped', 'Delivered', 'Cancelled']
-  }
+    enum: ['Processing', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled']
+  },
+  cancelledAt: { type: Date },
+  deliveredAt: { type: Date }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Order', OrderSchema);
+module.exports = mongoose.model('Order', orderSchema);
