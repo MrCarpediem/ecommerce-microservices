@@ -1,0 +1,152 @@
+services:
+  # 1. Service Registry
+  - type: web
+    name: shopease-registry
+    env: node
+    plan: free
+    rootDir: Backend/serviceRegistry
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5000
+
+  # 2. Auth Service
+  - type: web
+    name: shopease-auth
+    env: node
+    plan: free
+    rootDir: Backend/authService
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5001
+      - key: MONGO_URI
+        sync: false # You will enter this in the Render dashboard
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: JWT_REFRESH_SECRET
+        value: shopease_refresh_secret_2026
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: SERVICE_SECRET
+        value: shopease_service_secret_2026
+      - key: REGISTRY_URL
+        value: http://shopease-registry:5000
+      - key: SERVICE_URL
+        value: http://shopease-auth:5001
+
+  # 3. User Service
+  - type: web
+    name: shopease-user
+    env: node
+    plan: free
+    rootDir: Backend/userService
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5002
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: SERVICE_SECRET
+        value: shopease_service_secret_2026
+      - key: REGISTRY_URL
+        value: http://shopease-registry:5000
+      - key: SERVICE_URL
+        value: http://shopease-user:5002
+
+  # 4. Product Service
+  - type: web
+    name: shopease-product
+    env: node
+    plan: free
+    rootDir: Backend/productService
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5003
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: SERVICE_SECRET
+        value: shopease_service_secret_2026
+      - key: REGISTRY_URL
+        value: http://shopease-registry:5000
+      - key: SERVICE_URL
+        value: http://shopease-product:5003
+
+  # 5. Cart Service
+  - type: web
+    name: shopease-cart
+    env: node
+    plan: free
+    rootDir: Backend/cartService
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5004
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: SERVICE_SECRET
+        value: shopease_service_secret_2026
+      - key: REGISTRY_URL
+        value: http://shopease-registry:5000
+      - key: SERVICE_URL
+        value: http://shopease-cart:5004
+
+  # 6. Order Service
+  - type: web
+    name: shopease-order
+    env: node
+    plan: free
+    rootDir: Backend/orderService
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5005
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: SERVICE_SECRET
+        value: shopease_service_secret_2026
+      - key: REGISTRY_URL
+        value: http://shopease-registry:5000
+      - key: SERVICE_URL
+        value: http://shopease-order:5005
+
+  # 7. API Gateway (This one MUST be accessed by Vercel)
+  - type: web
+    name: shopease-gateway
+    env: node
+    plan: free
+    rootDir: Backend/apiGateway
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5006
+      - key: JWT_SECRET
+        value: shopease_super_secret_2026
+      - key: AUTH_SERVICE_URL
+        value: http://shopease-auth:5001
+      - key: USER_SERVICE_URL
+        value: http://shopease-user:5002
+      - key: PRODUCT_SERVICE_URL
+        value: http://shopease-product:5003
+      - key: CART_SERVICE_URL
+        value: http://shopease-cart:5004
+      - key: ORDER_SERVICE_URL
+        value: http://shopease-order:5005
+      - key: FRONTEND_URL
+        sync: false # You will enter your Vercel URL here
