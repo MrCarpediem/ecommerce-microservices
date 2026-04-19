@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5006;
 
 // Security middlewares
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: '*' }));
 app.use(globalLimiter);
 app.use(requestLogger);
 
