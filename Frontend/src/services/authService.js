@@ -1,40 +1,31 @@
-
-import { proxyRequest, getToken } from './api';
+import api from './api';
 
 export const registerUser = async (userData) => {
-  return await proxyRequest('auth', 'register', 'POST', '/api/auth/register', userData);
+  const response = await api.post('/api/auth/register', userData);
+  return response.data;
 };
 
 export const loginUser = async (credentials) => {
-  return await proxyRequest('auth', 'login', 'POST', '/api/auth/login', credentials);
+  const response = await api.post('/api/auth/login', credentials);
+  return response.data;
 };
 
-
-export const getUserInfo = async () => {
-  const token = getToken();
-  if (!token) {
-    throw new Error('No authentication token found');
-  }
-  
-  return await proxyRequest('auth', 'getUserInfo', 'GET', '/api/auth/user', null, token);
+export const refreshToken = async () => {
+  const token = localStorage.getItem('refreshToken');
+  const response = await api.post('/api/auth/refresh', { refreshToken: token });
+  return response.data;
 };
 
-
-export const validateToken = async (token) => {
-  if (!token) {
-    return { valid: false };
-  }
-  
+export const logoutUser = async () => {
   try {
-    const response = await proxyRequest('auth', 'validateToken', 'GET', '/api/auth/validate-token', null, token);
-    return response;
-  } catch (error) {
-    console.error('Token validation failed:', error);
-    return { valid: false };
-  }
+    await api.post('/api/auth/logout');
+  } catch {}
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
 };
 
-
-export const logoutUser = () => {
-  localStorage.removeItem('token');
+export const getMe = async () => {
+  const response = await api.get('/api/auth/me');
+  return response.data;
 };

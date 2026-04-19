@@ -1,69 +1,53 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { validateToken, getUserInfo, logoutUser } from '../services/authService';
+import { getMe, logoutUser } from '../services/authService';
 
-// Create context
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        
+        const token = localStorage.getItem('accessToken');
         if (token) {
-          const validation = await validateToken(token);
-          
-          if (validation.valid) {
-            const userInfo = await getUserInfo();
-            setCurrentUser(userInfo);
-          } else {
-            // Token is invalid, clear it
-            localStorage.removeItem('token');
-            setCurrentUser(null);
-          }
+          const data = await getMe();
+          setCurrentUser(data.user);
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        setError('Failed to initialize authentication');
-        localStorage.removeItem('token');
+      } catch {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
         setCurrentUser(null);
       } finally {
         setLoading(false);
       }
     };
-
     initAuth();
   }, []);
 
-  const login = (token, user) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('userData', JSON.stringify(user));
+  const login = (accessToken, refreshToken, user) => {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
     setCurrentUser(user);
   };
 
-  const logout = () => {
-    logoutUser();
-    localStorage.removeItem('userData');
+  const logout = async () => {
+    await logoutUser();
     setCurrentUser(null);
   };
 
-  const value = {
-    currentUser,
-    loading,
-    error,
-    login,
-    logout,
-    isAuthenticated: !!currentUser
-  };
-
   return (
-    <AuthContext.Provider value={value}>
-      {children}
+    <AuthContext.Provider value={{
+      currentUser,
+      loading,
+      login,
+      logout,
+      isAuthenticated: !!currentUser
+    }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

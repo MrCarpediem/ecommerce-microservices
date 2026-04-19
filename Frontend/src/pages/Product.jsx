@@ -1,96 +1,173 @@
-
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProducts } from '../contexts/ProductContext';
+import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import ProductCard from '../components/ProductCard';
+import Loader from '../components/Loader';
 
 const Product = () => {
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { fetchProducts, loading, error } = useProducts();
   const { addToCart } = useCart();
-  const { 
-    featuredProducts, 
-    loading, 
-    error, 
-    fetchFeaturedProducts 
-  } = useProducts();
+  const { isAuthenticated } = useAuth();
+
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [toast, setToast] = useState(null);
+
+  const category = searchParams.get('category') || '';
+  const sort = searchParams.get('sort') || '';
+  const search = searchParams.get('search') || '';
+  const page = parseInt(searchParams.get('page') || '1');
+
+  const [searchInput, setSearchInput] = useState(search);
 
   useEffect(() => {
-    // Fetch featured products when component mounts
-    fetchFeaturedProducts();
-  }, []);
+    loadProducts();
+  }, [category, sort, page, search]);
 
-  const handleAddToCart = async (product) => {
-    if (!isAuthenticated) {
-      if (window.confirm('Please log in to add items to your cart. Go to login page?')) {
-        navigate('/login');
-      }
-      return;
-    }
-    
-    try {
-      const result = await addToCart(product);
-      if (result) {
-        // Show success message
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
-        toast.textContent = `${product.name} added to cart!`;
-        document.body.appendChild(toast);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 3000);
-      }
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-    }
+  const loadProducts = async () => {
+    const data = await fetchProducts({ category, sort, page, limit: 12, search });
+    setProducts(data.products || []);
+    setTotal(data.total || 0);
+    setTotalPages(data.totalPages || 1);
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="text-center mb-10">
-       <h1>Products Page</h1>
-      </div>
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-        </div>
-      ) : error ? (
-        <div className="text-center bg-red-100 p-4 rounded-md text-red-700">{error}</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {featuredProducts.map((product) => (
-            <div key={product._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-              <div className="h-48 bg-gray-200">
-                {product.image ? (
-                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="text-lg font-semibold mb-2">{product.name}</h3>
-                <p className="text-gray-600 mb-2 line-clamp-2">{product.description}</p>
-                <p className="text-lg font-bold text-blue-600">Rs {product.price.toFixed(2)}</p>
-                <button
-                  className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
-                  onClick={() => handleAddToCart(product)}
-                >
-                  Add to Cart
-                </button>
-              </div>
-            </div>
-          ))}
+  const handleAddToCart = async (product) => {
+    if (!isAuthenticated) { navigate('/login'); return; }
+    const success = await addToCart(product._id, 1);
+    if (success) showToast(`${product.name} added to cart!`);
+    else showToast('Failed to add item', 'error');
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearchParams({ ...Object.fromEntries(searchParams), search: searchInput, page: '1' });
+  };
+
+  const categories = ['Electronics', 'Clothing', 'Books', 'Home & Garden', 'Sports', 'Beauty'];
+  const sortOptions = [
+    { value: '', label: 'Default' },
+    { value: 'price:asc', label: 'Price: Low to High' },
+    { value: 'price:desc', label: 'Price: High to Low' },
+    { value: 'createdAt:desc', label: 'Newest First' }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 z-50 px-6 py-3 rounded-lg shadow-xl text-white ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+          {toast.message}
         </div>
       )}
+
+      {/* Header */}
+      <div className="bg-white shadow-sm py-6">
+        <div className="container mx-auto px-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">All Products</h1>
+          
+          {/* Search */}
+          <form onSubmit={handleSearch} className="flex gap-2 max-w-lg">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search products..."
+              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+              Search
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar Filters */}
+          <div className="lg:w-64 flex-shrink-0">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Categories</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setSearchParams({ page: '1' })}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${!category ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                >
+                  All Categories
+                </button>
+                {categories.map(cat => (
+                  <button key={cat}
+                    onClick={() => setSearchParams({ category: cat, page: '1' })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${category === cat ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <h3 className="font-semibold text-gray-900 mt-6 mb-4">Sort By</h3>
+              <div className="space-y-2">
+                {sortOptions.map(opt => (
+                  <button key={opt.value}
+                    onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), sort: opt.value, page: '1' })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${sort === opt.value ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Products Grid */}
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-gray-600">{total} products found</p>
+            </div>
+
+            {loading ? <Loader /> : error ? (
+              <div className="text-center text-red-600 py-8">{error}</div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-gray-500 text-lg">No products found.</p>
+                <button onClick={() => setSearchParams({})} className="mt-4 text-blue-600 hover:underline">
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {products.map(product => (
+                    <ProductCard key={product._id} product={product} onAddToCart={handleAddToCart} />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center gap-2 mt-10">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                      <button key={p}
+                        onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), page: p.toString() })}
+                        className={`w-10 h-10 rounded-lg font-medium transition ${page === p ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border'}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

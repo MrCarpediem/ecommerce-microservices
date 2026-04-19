@@ -1,62 +1,35 @@
 import axios from 'axios';
 
-
-const REGISTRY_URL = import.meta.env.VITE_REGISTRY_URL || 'http://localhost:5000';
-
+const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5006';
 
 const api = axios.create({
-  baseURL: REGISTRY_URL,
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' }
 });
 
-
-export const getServiceDetails = async (serviceName) => {
-  try {
-    const response = await api.get(`/service/${serviceName}`);
-    return response.data;
-  } catch (error) {
-    console.error(`Failed to get ${serviceName} service details:`, error);
-    throw error;
+// Request interceptor — token add karo
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-};
+  return config;
+}, (error) => Promise.reject(error));
 
-export const createServiceApi = async (serviceName) => {
-  try {
-    const serviceDetails = await getServiceDetails(serviceName);
-    
-    return {
-      instance: axios.create({
-        baseURL: serviceDetails.url,
-      }),
-      endpoints: serviceDetails.endpoints,
-    };
-  } catch (error) {
-    console.error(`Failed to create API for ${serviceName}:`, error);
-    throw error;
-  }
-};
-
-
-export const proxyRequest = async (service, endpoint, method, url, data, token) => {
-  try {
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+// Response interceptor — 401 handle karo
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
-
-    const response = await api.post(`/proxy/${service}/${endpoint}`, {
-      method,
-      url,
-      data,
-      headers,
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error('Proxy request failed:', error);
-    throw error.response?.data || error;
+    return Promise.reject(error);
   }
-};
+);
 
-export const getToken = () => {
-  return localStorage.getItem('token');
-};
+export default api;

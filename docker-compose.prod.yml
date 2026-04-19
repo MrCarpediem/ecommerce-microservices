@@ -4,10 +4,8 @@ services:
   mongo:
     image: mongo:6.0
     restart: unless-stopped
-    ports:
-      - '27020:27017'
     volumes:
-      - mongo-data:/data/db
+      - mongo-prod-data:/data/db
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
@@ -18,11 +16,9 @@ services:
   registry:
     build:
       context: ./Backend/serviceRegistry
-    restart: unless-stopped
-    ports:
-      - '5007:5000'
     environment:
       - PORT=5000
+      - NODE_ENV=production
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
       interval: 10s
@@ -32,19 +28,15 @@ services:
   auth:
     build:
       context: ./Backend/authService
-    restart: unless-stopped
-    ports:
-      - '5001:5001'
     environment:
       - PORT=5001
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/auth-service
-      - JWT_SECRET=shopease_super_secret_2026
-      - JWT_REFRESH_SECRET=shopease_refresh_secret_2026
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
       - JWT_EXPIRES_IN=24h
-      - SERVICE_SECRET=shopease_service_secret_2026
+      - SERVICE_SECRET=${SERVICE_SECRET:-production_service_secret}
       - REGISTRY_URL=http://registry:5000
       - SERVICE_URL=http://auth:5001
-      - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
@@ -54,17 +46,14 @@ services:
   user:
     build:
       context: ./Backend/userService
-    restart: unless-stopped
-    ports:
-      - '5002:5002'
     environment:
       - PORT=5002
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/user-service
-      - JWT_SECRET=shopease_super_secret_2026
-      - SERVICE_SECRET=shopease_service_secret_2026
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
+      - SERVICE_SECRET=${SERVICE_SECRET:-production_service_secret}
       - REGISTRY_URL=http://registry:5000
       - SERVICE_URL=http://user:5002
-      - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
@@ -74,39 +63,33 @@ services:
   product:
     build:
       context: ./Backend/productService
-    restart: unless-stopped
-    ports:
-      - '5003:5003'
     environment:
       - PORT=5003
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/product-service
-      - JWT_SECRET=shopease_super_secret_2026
-      - SERVICE_SECRET=shopease_service_secret_2026
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
+      - SERVICE_SECRET=${SERVICE_SECRET:-production_service_secret}
       - REGISTRY_URL=http://registry:5000
       - SERVICE_URL=http://product:5003
-      - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
       registry:
         condition: service_healthy
     volumes:
-      - product-uploads:/app/uploads
+      - product-prod-uploads:/app/uploads
 
   cart:
     build:
       context: ./Backend/cartService
-    restart: unless-stopped
-    ports:
-      - '5004:5004'
     environment:
       - PORT=5004
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/cart-service
-      - JWT_SECRET=shopease_super_secret_2026
-      - SERVICE_SECRET=shopease_service_secret_2026
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
+      - SERVICE_SECRET=${SERVICE_SECRET:-production_service_secret}
       - REGISTRY_URL=http://registry:5000
       - SERVICE_URL=http://cart:5004
-      - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
@@ -116,17 +99,14 @@ services:
   order:
     build:
       context: ./Backend/orderService
-    restart: unless-stopped
-    ports:
-      - '5005:5005'
     environment:
       - PORT=5005
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/order-service
-      - JWT_SECRET=shopease_super_secret_2026
-      - SERVICE_SECRET=shopease_service_secret_2026
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
+      - SERVICE_SECRET=${SERVICE_SECRET:-production_service_secret}
       - REGISTRY_URL=http://registry:5000
       - SERVICE_URL=http://order:5005
-      - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
@@ -136,18 +116,18 @@ services:
   gateway:
     build:
       context: ./Backend/apiGateway
-    restart: unless-stopped
     ports:
-      - '5006:5006'
+      - '80:5006' # EXPOSED AS PORT 80 for production access
     environment:
       - PORT=5006
+      - NODE_ENV=production
       - AUTH_SERVICE_URL=http://auth:5001
       - USER_SERVICE_URL=http://user:5002
       - PRODUCT_SERVICE_URL=http://product:5003
       - CART_SERVICE_URL=http://cart:5004
       - ORDER_SERVICE_URL=http://order:5005
-      - FRONTEND_URL=http://localhost:5173
-      - JWT_SECRET=shopease_super_secret_2026
+      - FRONTEND_URL=${FRONTEND_URL:-https://your-vercel-domain.vercel.app}
+      - JWT_SECRET=${JWT_SECRET:-production_secure_secret}
     depends_on:
       - auth
       - user
@@ -155,19 +135,8 @@ services:
       - cart
       - order
 
-  frontend:
-    build:
-      context: ./Frontend
-    restart: unless-stopped
-    ports:
-      - '5173:4173'
-    environment:
-      - VITE_API_GATEWAY_URL=http://localhost:5006
-    depends_on:
-      - gateway
-
 volumes:
-  mongo-data:
+  mongo-prod-data:
     driver: local
-  product-uploads:
+  product-prod-uploads:
     driver: local

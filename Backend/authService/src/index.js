@@ -40,25 +40,35 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'auth-service', timestamp: new Date().toISOString() });
 });
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
   logger.info(`Auth service running on port ${PORT}`);
-  try {
-    await axios.post(`${REGISTRY_URL}/register`, {
-      name: 'auth',
-      url: SERVICE_URL,
-      endpoints: {
-        login: '/api/auth/login',
-        register: '/api/auth/register',
-        refresh: '/api/auth/refresh',
-        logout: '/api/auth/logout',
-        validateToken: '/api/auth/validate-token',
-        me: '/api/auth/me'
+  
+  const registerService = async (retryCount = 0) => {
+    try {
+      await axios.post(`${REGISTRY_URL}/register`, {
+        name: 'auth',
+        url: SERVICE_URL,
+        endpoints: {
+          login: '/api/auth/login',
+          register: '/api/auth/register',
+          refresh: '/api/auth/refresh',
+          logout: '/api/auth/logout',
+          validateToken: '/api/auth/validate-token',
+          me: '/api/auth/me'
+        }
+      });
+      logger.info('Auth service registered with service registry.');
+    } catch (err) {
+      logger.warn(`Could not register with service registry. Retrying in 5s... (${err.message})`);
+      if (retryCount < 5) {
+        setTimeout(() => registerService(retryCount + 1), 5000);
+      } else {
+        logger.error('Failed to register with service registry after 5 attempts.');
       }
-    });
-    logger.info('Auth service registered with service registry.');
-  } catch (err) {
-    logger.warn('Could not register with service registry:', err.message);
-  }
+    }
+  };
+  
+  registerService();
 });
 
 const gracefulShutdown = () => {

@@ -39,25 +39,35 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'user-service', timestamp: new Date().toISOString() });
 });
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
   logger.info(`User service running on port ${PORT}`);
-  try {
-    await axios.post(`${REGISTRY_URL}/register`, {
-      name: 'user',
-      url: SERVICE_URL,
-      endpoints: {
-        getProfile: '/api/users/profile',
-        updateProfile: '/api/users/profile',
-        addAddress: '/api/users/addresses',
-        removeAddress: '/api/users/addresses/:addressId',
-        getAllUsers: '/api/users',
-        getUserById: '/api/users/:userId'
+  
+  const registerService = async (retryCount = 0) => {
+    try {
+      await axios.post(`${REGISTRY_URL}/register`, {
+        name: 'user',
+        url: SERVICE_URL,
+        endpoints: {
+          getProfile: '/api/users/profile',
+          updateProfile: '/api/users/profile',
+          addAddress: '/api/users/addresses',
+          removeAddress: '/api/users/addresses/:addressId',
+          getAllUsers: '/api/users',
+          getUserById: '/api/users/:userId'
+        }
+      });
+      logger.info('User service registered with service registry.');
+    } catch (err) {
+      logger.warn(`Could not register with service registry. Retrying in 5s... (${err.message})`);
+      if (retryCount < 5) {
+        setTimeout(() => registerService(retryCount + 1), 5000);
+      } else {
+        logger.error('Failed to register with service registry after 5 attempts.');
       }
-    });
-    logger.info('User service registered with service registry.');
-  } catch (err) {
-    logger.warn('Could not register with service registry:', err.message);
-  }
+    }
+  };
+
+  registerService();
 });
 
 const gracefulShutdown = () => {

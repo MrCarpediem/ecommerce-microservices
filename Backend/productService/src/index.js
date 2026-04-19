@@ -41,24 +41,34 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'product-service', timestamp: new Date().toISOString() });
 });
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
   logger.info(`Product service running on port ${PORT}`);
-  try {
-    await axios.post(`${REGISTRY_URL}/register`, {
-      name: 'product',
-      url: SERVICE_URL,
-      endpoints: {
-        getProducts: '/api/products',
-        getProductById: '/api/products/:id',
-        createProduct: '/api/products',
-        updateProduct: '/api/products/:id',
-        deleteProduct: '/api/products/:id'
+
+  const registerService = async (retryCount = 0) => {
+    try {
+      await axios.post(`${REGISTRY_URL}/register`, {
+        name: 'product',
+        url: SERVICE_URL,
+        endpoints: {
+          getProducts: '/api/products',
+          getProductById: '/api/products/:id',
+          createProduct: '/api/products',
+          updateProduct: '/api/products/:id',
+          deleteProduct: '/api/products/:id'
+        }
+      });
+      logger.info('Product service registered with service registry.');
+    } catch (err) {
+      logger.warn(`Could not register with service registry. Retrying in 5s... (${err.message})`);
+      if (retryCount < 5) {
+        setTimeout(() => registerService(retryCount + 1), 5000);
+      } else {
+        logger.error('Failed to register with service registry after 5 attempts.');
       }
-    });
-    logger.info('Product service registered with service registry.');
-  } catch (err) {
-    logger.warn('Could not register with service registry:', err.message);
-  }
+    }
+  };
+
+  registerService();
 });
 
 const gracefulShutdown = () => {

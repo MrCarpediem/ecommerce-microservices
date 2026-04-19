@@ -40,25 +40,35 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'cart-service', timestamp: new Date().toISOString() });
 });
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
   logger.info(`Cart service running on port ${PORT}`);
-  try {
-    await axios.post(`${REGISTRY_URL}/register`, {
-      name: 'cart',
-      url: SERVICE_URL,
-      endpoints: {
-        getCart: '/api/cart',
-        addItem: '/api/cart/items',
-        updateItem: '/api/cart/items/:itemId',
-        removeItem: '/api/cart/items/:itemId',
-        clearCart: '/api/cart',
-        internalClear: '/api/cart/internal/clear'
+
+  const registerService = async (retryCount = 0) => {
+    try {
+      await axios.post(`${REGISTRY_URL}/register`, {
+        name: 'cart',
+        url: SERVICE_URL,
+        endpoints: {
+          getCart: '/api/cart',
+          addItem: '/api/cart/items',
+          updateItem: '/api/cart/items/:itemId',
+          removeItem: '/api/cart/items/:itemId',
+          clearCart: '/api/cart',
+          internalClear: '/api/cart/internal/clear'
+        }
+      });
+      logger.info('Cart service registered with service registry.');
+    } catch (err) {
+      logger.warn(`Could not register with service registry. Retrying in 5s... (${err.message})`);
+      if (retryCount < 5) {
+        setTimeout(() => registerService(retryCount + 1), 5000);
+      } else {
+        logger.error('Failed to register with service registry after 5 attempts.');
       }
-    });
-    logger.info('Cart service registered with service registry.');
-  } catch (err) {
-    logger.warn('Could not register with service registry:', err.message);
-  }
+    }
+  };
+
+  registerService();
 });
 
 const gracefulShutdown = () => {
