@@ -139,14 +139,29 @@ services:
       - key: JWT_SECRET
         value: shopease_super_secret_2026
       - key: AUTH_SERVICE_URL
-        value: http://shopease-auth:5001
+        fromService:
+          type: web
+          name: shopease-auth
+          envVarKey: RENDER_EXTERNAL_URL
       - key: USER_SERVICE_URL
-        value: http://shopease-user:5002
+        fromService:
+          type: web
+          name: shopease-user
+          envVarKey: RENDER_EXTERNAL_URL
       - key: PRODUCT_SERVICE_URL
-        value: http://shopease-product:5003
+        fromService:
+          type: web
+          name: shopease-product
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CART_SERVICE_URL
-        value: http://shopease-cart:5004
+        fromService:
+          type: web
+          name: shopease-cart
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ORDER_SERVICE_URL
-        value: http://shopease-order:5005
+        fromService:
+          type: web
+          name: shopease-order
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FRONTEND_URL
         sync: false # You will enter your Vercel URL here
