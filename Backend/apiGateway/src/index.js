@@ -16,7 +16,6 @@ const PORT = process.env.PORT || 5006;
 // Security middlewares
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
-app.use(express.json({ limit: '10kb' }));
 app.use(globalLimiter);
 app.use(requestLogger);
 
@@ -61,19 +60,19 @@ app.get('/health/services', async (req, res) => {
 // Proxy all routes to respective services
 Object.entries(routes).forEach(([name, config]) => {
   app.use(
-    config.prefix,
     createProxyMiddleware({
       target: config.target,
       changeOrigin: true,
+      pathFilter: config.prefix,
       on: {
         error: (err, req, res) => {
           logger.error(`Proxy error for ${name}:`, err.message);
-          res.status(503).json({
-            error: `${name} service unavailable.`
-          });
+          if (!res.headersSent) {
+            res.status(503).json({ error: `${name} service unavailable.` });
+          }
         },
         proxyReq: (proxyReq, req) => {
-          logger.info(`Proxying ${req.method} ${req.path} → ${name}`);
+          logger.info(`Proxying ${req.method} ${req.originalUrl} → ${name}`);
         }
       }
     })

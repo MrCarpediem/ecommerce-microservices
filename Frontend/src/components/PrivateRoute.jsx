@@ -2,8 +2,8 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const PrivateRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
+const PrivateRoute = ({ children, roles }) => {
+  const { isAuthenticated, loading, currentUser } = useAuth();
 
   if (loading) {
     return (
@@ -18,7 +18,17 @@ const PrivateRoute = () => {
     );
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  if (roles && roles.length > 0) {
+    if (!currentUser || !roles.includes(currentUser.role)) {
+      return <Navigate to="/" />; // Redirect unauthorized users to home
+    }
+  }
+
+  return children ? children : <Outlet />;
 };
 
 export default PrivateRoute;

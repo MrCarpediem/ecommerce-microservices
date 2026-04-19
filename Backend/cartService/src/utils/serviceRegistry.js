@@ -24,7 +24,7 @@ class ServiceClient {
           headers: { 'x-service-secret': SERVICE_SECRET }
         }
       );
-      return response.data;
+      return response.data.product || response.data;
     } catch (error) {
       logger.error('Error fetching product details:', error.message);
       throw new Error('Product service unavailable');

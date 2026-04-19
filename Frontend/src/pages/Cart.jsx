@@ -96,15 +96,10 @@ const Cart = () => {
       const orderData = {
         items: cart.items.map(item => ({
           productId: item.productId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          imageUrl: item.image
+          quantity: item.quantity
         })),
-        totalAmount: finalAmount,
         shippingAddress,
-        paymentMethod,
-        discount: couponApplied ? discountAmount : 0
+        paymentMethod
       };
       
       const newOrder = await placeOrder(orderData);

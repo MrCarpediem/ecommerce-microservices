@@ -35,9 +35,9 @@ const authenticate = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.headers['x-user-id'] = decoded.userId;
-    req.headers['x-user-role'] = decoded.role;
-    req.headers['x-user-email'] = decoded.email;
+    req.headers['x-user-id'] = decoded.userId || '';
+    req.headers['x-user-role'] = decoded.role || '';
+    req.headers['x-user-email'] = decoded.email || '';
 
     next();
   } catch (err) {

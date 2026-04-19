@@ -2,18 +2,19 @@ version: '3.8'
 
 services:
   mongo:
-    image: mongo:6.0
+    image: mongo:4.4
     restart: unless-stopped
     ports:
       - '27020:27017'
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet || mongo --eval "db.adminCommand('ping')" || exit 0
       interval: 10s
-      timeout: 10s
+      timeout: 5s
       retries: 5
-      start_period: 40s
+    networks:
+      - ecommerce-net
 
   registry:
     build:
@@ -24,10 +25,12 @@ services:
     environment:
       - PORT=5000
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ecommerce-net
 
   auth:
     build:
@@ -37,19 +40,21 @@ services:
       - '5001:5001'
     environment:
       - PORT=5001
-      - MONGO_URI=mongodb://mongo:27017/auth-service
+      - MONGO_URI=mongodb://172.17.0.1:27020/auth-service
       - JWT_SECRET=shopease_super_secret_2026
       - JWT_REFRESH_SECRET=shopease_refresh_secret_2026
       - JWT_EXPIRES_IN=24h
       - SERVICE_SECRET=shopease_service_secret_2026
-      - REGISTRY_URL=http://registry:5000
-      - SERVICE_URL=http://auth:5001
+      - REGISTRY_URL=http://172.17.0.1:5007
+      - SERVICE_URL=http://172.17.0.1:5001
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
       registry:
         condition: service_healthy
+    networks:
+      - ecommerce-net
 
   user:
     build:
@@ -59,17 +64,19 @@ services:
       - '5002:5002'
     environment:
       - PORT=5002
-      - MONGO_URI=mongodb://mongo:27017/user-service
+      - MONGO_URI=mongodb://172.17.0.1:27020/user-service
       - JWT_SECRET=shopease_super_secret_2026
       - SERVICE_SECRET=shopease_service_secret_2026
-      - REGISTRY_URL=http://registry:5000
-      - SERVICE_URL=http://user:5002
+      - REGISTRY_URL=http://172.17.0.1:5007
+      - SERVICE_URL=http://172.17.0.1:5002
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
       registry:
         condition: service_healthy
+    networks:
+      - ecommerce-net
 
   product:
     build:
@@ -79,11 +86,11 @@ services:
       - '5003:5003'
     environment:
       - PORT=5003
-      - MONGO_URI=mongodb://mongo:27017/product-service
+      - MONGO_URI=mongodb://172.17.0.1:27020/product-service
       - JWT_SECRET=shopease_super_secret_2026
       - SERVICE_SECRET=shopease_service_secret_2026
-      - REGISTRY_URL=http://registry:5000
-      - SERVICE_URL=http://product:5003
+      - REGISTRY_URL=http://172.17.0.1:5007
+      - SERVICE_URL=http://172.17.0.1:5003
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
@@ -92,6 +99,8 @@ services:
         condition: service_healthy
     volumes:
       - product-uploads:/app/uploads
+    networks:
+      - ecommerce-net
 
   cart:
     build:
@@ -101,17 +110,19 @@ services:
       - '5004:5004'
     environment:
       - PORT=5004
-      - MONGO_URI=mongodb://mongo:27017/cart-service
+      - MONGO_URI=mongodb://172.17.0.1:27020/cart-service
       - JWT_SECRET=shopease_super_secret_2026
       - SERVICE_SECRET=shopease_service_secret_2026
-      - REGISTRY_URL=http://registry:5000
-      - SERVICE_URL=http://cart:5004
+      - REGISTRY_URL=http://172.17.0.1:5007
+      - SERVICE_URL=http://172.17.0.1:5004
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
       registry:
         condition: service_healthy
+    networks:
+      - ecommerce-net
 
   order:
     build:
@@ -121,17 +132,19 @@ services:
       - '5005:5005'
     environment:
       - PORT=5005
-      - MONGO_URI=mongodb://mongo:27017/order-service
+      - MONGO_URI=mongodb://172.17.0.1:27020/order-service
       - JWT_SECRET=shopease_super_secret_2026
       - SERVICE_SECRET=shopease_service_secret_2026
-      - REGISTRY_URL=http://registry:5000
-      - SERVICE_URL=http://order:5005
+      - REGISTRY_URL=http://172.17.0.1:5007
+      - SERVICE_URL=http://172.17.0.1:5005
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       mongo:
         condition: service_healthy
       registry:
         condition: service_healthy
+    networks:
+      - ecommerce-net
 
   gateway:
     build:
@@ -141,19 +154,26 @@ services:
       - '5006:5006'
     environment:
       - PORT=5006
-      - AUTH_SERVICE_URL=http://auth:5001
-      - USER_SERVICE_URL=http://user:5002
-      - PRODUCT_SERVICE_URL=http://product:5003
-      - CART_SERVICE_URL=http://cart:5004
-      - ORDER_SERVICE_URL=http://order:5005
+      - AUTH_SERVICE_URL=http://172.17.0.1:5001
+      - USER_SERVICE_URL=http://172.17.0.1:5002
+      - PRODUCT_SERVICE_URL=http://172.17.0.1:5003
+      - CART_SERVICE_URL=http://172.17.0.1:5004
+      - ORDER_SERVICE_URL=http://172.17.0.1:5005
       - FRONTEND_URL=http://localhost:5173
       - JWT_SECRET=shopease_super_secret_2026
     depends_on:
-      - auth
-      - user
-      - product
-      - cart
-      - order
+      auth:
+        condition: service_started
+      user:
+        condition: service_started
+      product:
+        condition: service_started
+      cart:
+        condition: service_started
+      order:
+        condition: service_started
+    networks:
+      - ecommerce-net
 
   frontend:
     build:
@@ -165,6 +185,12 @@ services:
       - VITE_API_GATEWAY_URL=http://localhost:5006
     depends_on:
       - gateway
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
 
 volumes:
   mongo-data:

@@ -121,7 +121,15 @@ const Checkout = () => {
     };
     
     try {
-      const order = await createOrder(shippingAddress, formData.paymentMethod);
+      const orderData = {
+        items: cart.items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity
+        })),
+        shippingAddress,
+        paymentMethod: formData.paymentMethod
+      };
+      const order = await createOrder(orderData);
       
       if (order) {
         // Redirect to order confirmation page

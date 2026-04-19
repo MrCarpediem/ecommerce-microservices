@@ -24,6 +24,11 @@ const routes = {
     target: process.env.ORDER_SERVICE_URL || 'http://localhost:5005',
     prefix: '/api/orders',
     public: []
+  },
+  uploads: {
+    target: process.env.PRODUCT_SERVICE_URL || 'http://localhost:5003',
+    prefix: '/uploads',
+    public: ['/uploads']
   }
 };
 
