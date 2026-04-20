@@ -1,7 +1,7 @@
 services:
   # 1. Service Registry
   - type: web
-    name: shopease-registry
+    name: shopease-registry-v1
     env: node
     plan: free
     rootDir: Backend/serviceRegistry
@@ -13,7 +13,7 @@ services:
 
   # 2. Auth Service
   - type: web
-    name: shopease-auth
+    name: shopease-auth-v1
     env: node
     plan: free
     rootDir: Backend/authService
@@ -23,7 +23,7 @@ services:
       - key: PORT
         value: 5001
       - key: MONGO_URI
-        sync: false # You will enter this in the Render dashboard
+        sync: false
       - key: JWT_SECRET
         value: shopease_super_secret_2026
       - key: JWT_REFRESH_SECRET
@@ -33,13 +33,16 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry:5000
+        value: http://shopease-registry-v1:5000
       - key: SERVICE_URL
-        value: http://shopease-auth:5001
+        fromService:
+          type: web
+          name: shopease-auth-v1
+          envVarKey: RENDER_EXTERNAL_URL
 
   # 3. User Service
   - type: web
-    name: shopease-user
+    name: shopease-user-v1
     env: node
     plan: free
     rootDir: Backend/userService
@@ -55,13 +58,16 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry:5000
+        value: http://shopease-registry-v1:5000
       - key: SERVICE_URL
-        value: http://shopease-user:5002
+        fromService:
+          type: web
+          name: shopease-user-v1
+          envVarKey: RENDER_EXTERNAL_URL
 
   # 4. Product Service
   - type: web
-    name: shopease-product
+    name: shopease-product-v1
     env: node
     plan: free
     rootDir: Backend/productService
@@ -77,13 +83,16 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry:5000
+        value: http://shopease-registry-v1:5000
       - key: SERVICE_URL
-        value: http://shopease-product:5003
+        fromService:
+          type: web
+          name: shopease-product-v1
+          envVarKey: RENDER_EXTERNAL_URL
 
   # 5. Cart Service
   - type: web
-    name: shopease-cart
+    name: shopease-cart-v1
     env: node
     plan: free
     rootDir: Backend/cartService
@@ -99,13 +108,16 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry:5000
+        value: http://shopease-registry-v1:5000
       - key: SERVICE_URL
-        value: http://shopease-cart:5004
+        fromService:
+          type: web
+          name: shopease-cart-v1
+          envVarKey: RENDER_EXTERNAL_URL
 
   # 6. Order Service
   - type: web
-    name: shopease-order
+    name: shopease-order-v1
     env: node
     plan: free
     rootDir: Backend/orderService
@@ -121,13 +133,16 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry:5000
+        value: http://shopease-registry-v1:5000
       - key: SERVICE_URL
-        value: http://shopease-order:5005
+        fromService:
+          type: web
+          name: shopease-order-v1
+          envVarKey: RENDER_EXTERNAL_URL
 
-  # 7. API Gateway (This one MUST be accessed by Vercel)
+  # 7. API Gateway
   - type: web
-    name: shopease-gateway
+    name: shopease-gateway-v1
     env: node
     plan: free
     rootDir: Backend/apiGateway
@@ -141,27 +156,27 @@ services:
       - key: AUTH_SERVICE_URL
         fromService:
           type: web
-          name: shopease-auth
+          name: shopease-auth-v1
           envVarKey: RENDER_EXTERNAL_URL
       - key: USER_SERVICE_URL
         fromService:
           type: web
-          name: shopease-user
+          name: shopease-user-v1
           envVarKey: RENDER_EXTERNAL_URL
       - key: PRODUCT_SERVICE_URL
         fromService:
           type: web
-          name: shopease-product
+          name: shopease-product-v1
           envVarKey: RENDER_EXTERNAL_URL
       - key: CART_SERVICE_URL
         fromService:
           type: web
-          name: shopease-cart
+          name: shopease-cart-v1
           envVarKey: RENDER_EXTERNAL_URL
       - key: ORDER_SERVICE_URL
         fromService:
           type: web
-          name: shopease-order
+          name: shopease-order-v1
           envVarKey: RENDER_EXTERNAL_URL
       - key: FRONTEND_URL
-        sync: false # You will enter your Vercel URL here
+        sync: false

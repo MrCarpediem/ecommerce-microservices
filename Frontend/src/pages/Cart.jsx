@@ -204,7 +204,7 @@ const Cart = () => {
                       <motion.div layout key={item._id} className="p-6 flex gap-6">
                         <div className="w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
                           {item.image ? (
-                            <img src={item.image.startsWith('http') ? item.image : `http://localhost:5006${item.image}`} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
+                            <img src={item.image?.startsWith('http') ? item.image : `${import.meta.env.VITE_API_GATEWAY_URL || ''}${item.image}`} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-300"><ShoppingBag size={24} /></div>
                           )}

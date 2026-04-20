@@ -19,7 +19,7 @@ const ProductCard = ({ product, onAddToCart }) => {
           <motion.img 
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            src={`http://localhost:5006${product.image}`} 
+            src={product.image?.startsWith('http') ? product.image : `${import.meta.env.VITE_API_GATEWAY_URL || ''}${product.image}`} 
             alt={product.name}
             className="w-full h-full object-cover mix-blend-multiply" 
           />
