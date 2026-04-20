@@ -33,7 +33,7 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry-v1:5000
+        value: https://shopease-registry-v1.onrender.com
       - key: SERVICE_URL
         fromService:
           type: web
@@ -58,7 +58,7 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry-v1:5000
+        value: https://shopease-registry-v1.onrender.com
       - key: SERVICE_URL
         fromService:
           type: web
@@ -83,7 +83,7 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry-v1:5000
+        value: https://shopease-registry-v1.onrender.com
       - key: SERVICE_URL
         fromService:
           type: web
@@ -108,7 +108,7 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry-v1:5000
+        value: https://shopease-registry-v1.onrender.com
       - key: SERVICE_URL
         fromService:
           type: web
@@ -133,7 +133,7 @@ services:
       - key: SERVICE_SECRET
         value: shopease_service_secret_2026
       - key: REGISTRY_URL
-        value: http://shopease-registry-v1:5000
+        value: https://shopease-registry-v1.onrender.com
       - key: SERVICE_URL
         fromService:
           type: web
