@@ -105,7 +105,7 @@ const Cart = () => {
       const newOrder = await placeOrder(orderData);
       if (newOrder) {
         await clearCart();
-        navigate('/order-success', { state: { orderId: newOrder._id } });
+        navigate(`/order-confirmation/${newOrder._id}`);
       } else {
         throw new Error('Failed to create order');
       }

@@ -10,12 +10,14 @@ const Profile = () => {
 
 
   const user = {
-    username: authUser?.username || '',
+    name: authUser?.name || authUser?.username || '',
     email: authUser?.email || '',
     role: authUser?.role || '',
     fullName: getFullName(),
     ...userProfile
   };
+
+  const displayName = user.fullName || user.name || user.email || '?';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -25,10 +27,10 @@ const Profile = () => {
           <div className="md:w-1/4 bg-gray-50 p-4 border-r">
             <div className="flex items-center mb-6">
               <div className="h-16 w-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-                {user.username.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="ml-4">
-                <h2 className="text-xl font-semibold">{user.fullName || user.username}</h2>
+                <h2 className="text-xl font-semibold">{displayName}</h2>
                 <p className="text-gray-600">{user.email}</p>
               </div>
             </div>
