@@ -65,7 +65,7 @@ const ProductDetail = () => {
             {/* Image */}
             <div className="bg-gray-100 flex items-center justify-center min-h-80">
               {product.image ? (
-                <img src={`http://localhost:5003${product.image}`} alt={product.name}
+                <img src={product.image?.startsWith('http') ? product.image : `${import.meta.env.VITE_API_GATEWAY_URL || ''}${product.image}`} alt={product.name}
                   className="w-full h-full object-cover max-h-96" />
               ) : (
                 <div className="text-gray-400 text-6xl">📦</div>

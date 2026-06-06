@@ -6,7 +6,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
     <div className="flex items-center gap-4 py-4 border-b">
       <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
         {item.image ? (
-          <img src={`http://localhost:5003${item.image}`} alt={item.name} className="w-full h-full object-cover" />
+          <img src={item.image?.startsWith('http') ? item.image : `${import.meta.env.VITE_API_GATEWAY_URL || ''}${item.image}`} alt={item.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
