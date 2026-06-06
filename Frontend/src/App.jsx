@@ -13,7 +13,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Cart from './pages/Cart';
 import Profile from './pages/Profile';
-import Checkout from './pages/Checkout';
+
 import Order from './pages/Order';
 import Orders from './pages/Orders';
 import OrderConfirmation from './components/OrderConfirmation';
@@ -45,7 +45,7 @@ const App = () => {
                       {/* Protected */}
                       <Route path="/cart" element={<PrivateRoute><Cart /></PrivateRoute>} />
                       <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                      <Route path="/checkout" element={<PrivateRoute><Checkout /></PrivateRoute>} />
+
                       <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
                       <Route path="/orders/:id" element={<PrivateRoute><Order /></PrivateRoute>} />
                       <Route path="/order-confirmation/:orderId" element={<PrivateRoute><OrderConfirmation /></PrivateRoute>} />

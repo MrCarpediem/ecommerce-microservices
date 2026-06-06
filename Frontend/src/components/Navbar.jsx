@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { ShoppingCart, Search, User, Menu, X, LogOut, Settings, Package } from 'lucide-react';
@@ -16,6 +16,7 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,7 +48,11 @@ const Navbar = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    console.log(`Searching for: ${searchQuery}`);
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
+      setDropdownOpen(false);
+      setMobileMenuOpen(false);
+    }
     setSearchQuery('');
   };
 

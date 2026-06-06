@@ -11,6 +11,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5003;
 const REGISTRY_URL = process.env.REGISTRY_URL || 'http://localhost:5000';
 const SERVICE_URL = process.env.SERVICE_URL || `http://localhost:${PORT}`;

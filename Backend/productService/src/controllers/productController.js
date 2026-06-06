@@ -104,8 +104,8 @@ const updateProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found.' });
 
-    // Only creator or admin can update
-    if (product.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    const isAdmin = req.user.role === 'admin' || req.user.role?.name === 'admin';
+    if (product.createdBy.toString() !== req.user._id.toString() && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized to update this product.' });
     }
 
@@ -135,7 +135,8 @@ const deleteProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found.' });
 
-    if (product.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    const isAdmin = req.user.role === 'admin' || req.user.role?.name === 'admin';
+    if (product.createdBy.toString() !== req.user._id.toString() && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized to delete this product.' });
     }
 
